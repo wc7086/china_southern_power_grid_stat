@@ -377,7 +377,15 @@ class CSGOptionsFlowHandler(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
-        self.config_entry = config_entry
+        # Newer Home Assistant versions expose `config_entry` as a read-only
+        # property on OptionsFlow, so assigning to it raises.
+        # Store it on `_config_entry` (used by the property) and fall back to
+        # a plain attribute on older versions.
+        self._config_entry = config_entry
+        try:
+            self.config_entry = config_entry
+        except AttributeError:
+            pass
         self.all_electricity_accounts: list[CSGElectricityAccount] = []
 
     async def async_step_init(
