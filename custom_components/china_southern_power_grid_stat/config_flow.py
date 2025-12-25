@@ -30,7 +30,6 @@ from .const import (
     CONF_ELE_ACCOUNTS,
     CONF_GENERAL_ERROR,
     CONF_LOGIN_TYPE,
-    CONF_REFRESH_QR_CODE,
     CONF_SETTINGS,
     CONF_SMS_CODE,
     CONF_UPDATE_INTERVAL,
@@ -39,23 +38,15 @@ from .const import (
     DOMAIN,
     ERROR_CANNOT_CONNECT,
     ERROR_INVALID_AUTH,
-    ERROR_QR_NOT_SCANNED,
     ERROR_UNKNOWN,
-    LOGIN_TYPE_TO_QR_APP_NAME,
     STEP_ADD_ACCOUNT,
-    STEP_ALI_QR_LOGIN,
-    STEP_CSG_QR_LOGIN,
     STEP_INIT,
-    STEP_QR_LOGIN,
     STEP_SETTINGS,
     STEP_SMS_LOGIN,
-    STEP_SMS_PWD_LOGIN,
     STEP_USER,
     STEP_VALIDATE_SMS_CODE,
-    STEP_WX_QR_LOGIN,
 )
 from .csg_client import (
-    LOGIN_TYPE_TO_QR_CODE_TYPE,
     CSGClient,
     CSGElectricityAccount,
     InvalidCredentials,
@@ -84,19 +75,10 @@ class CSGConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """
         Handle the initial step.
-        Let user choose the login method.
+        Direct to SMS login (only login method supported).
         """
         self.context["user_data"] = {}
-        return self.async_show_menu(
-            step_id=STEP_USER,
-            menu_options=[
-                STEP_SMS_LOGIN,
-                STEP_SMS_PWD_LOGIN,
-                STEP_CSG_QR_LOGIN,
-                STEP_WX_QR_LOGIN,
-                STEP_ALI_QR_LOGIN,
-            ],
-        )
+        return await self.async_step_sms_login()
 
     async def async_step_sms_login(
         self, user_input: dict[str, Any] | None = None
@@ -120,33 +102,11 @@ class CSGConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self.context["user_data"][CONF_LOGIN_TYPE] = LoginType.LOGIN_TYPE_SMS
         return await self.async_step_validate_sms_code()
 
-    async def async_step_sms_pwd_login(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Handle SMS and password login step."""
-        if user_input is None:
-            return self.async_show_form(
-                step_id=STEP_SMS_PWD_LOGIN,
-                data_schema=vol.Schema(
-                    {
-                        vol.Required(CONF_USERNAME): vol.All(
-                            str, vol.Length(min=11, max=11), msg="请输入11位手机号"
-                        ),
-                        vol.Required(CONF_PASSWORD): vol.All(
-                            str, vol.Length(min=8, max=16), msg="请输入8-16位登陆密码"
-                        ),  # as shown on CSG web login page
-                    }
-                ),
-            )
-        self.context["user_data"][CONF_USERNAME] = user_input[CONF_USERNAME]
-        self.context["user_data"][CONF_PASSWORD] = user_input[CONF_PASSWORD]
-        self.context["user_data"][CONF_LOGIN_TYPE] = LoginType.LOGIN_TYPE_PWD_AND_SMS
-        return await self.async_step_validate_sms_code()
 
     async def async_step_validate_sms_code(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle SMS code validation step, for both SMS and SMS+password login."""
+        """Handle SMS code validation step for SMS login."""
         schema = vol.Schema(
             {
                 vol.Required(CONF_SMS_CODE): vol.All(
@@ -192,23 +152,11 @@ class CSGConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
         error_detail = ""
         try:
-            if login_type == LoginType.LOGIN_TYPE_SMS:
-                auth_token = await self.hass.async_add_executor_job(
-                    client.api_login_with_sms_code,
-                    username,
-                    sms_code,
-                )
-            elif login_type == LoginType.LOGIN_TYPE_PWD_AND_SMS:
-                auth_token = await self.hass.async_add_executor_job(
-                    client.api_login_with_password_and_sms_code,
-                    username,
-                    password,
-                    sms_code,
-                )
-            else:
-                raise ValueError(
-                    f"Invalid login type for step {STEP_VALIDATE_SMS_CODE}: {login_type}"
-                )
+            auth_token = await self.hass.async_add_executor_job(
+                client.api_login_with_sms_code,
+                username,
+                sms_code,
+            )
         except RequestException:
             errors[CONF_GENERAL_ERROR] = ERROR_CANNOT_CONNECT
         except InvalidCredentials as ice:
@@ -229,88 +177,6 @@ class CSGConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={"error_detail": error_detail},
         )
 
-    async def async_step_csg_qr_login(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """CSG APP QR Login"""
-        self.context["user_data"][CONF_LOGIN_TYPE] = LoginType.LOGIN_TYPE_CSG_QR
-        return await self.async_step_qr_login()
-
-    async def async_step_wx_qr_login(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """WeChat QR Login"""
-        self.context["user_data"][CONF_LOGIN_TYPE] = LoginType.LOGIN_TYPE_WX_QR
-        return await self.async_step_qr_login()
-
-    async def async_step_ali_qr_login(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """AliPay QR Login"""
-        self.context["user_data"][CONF_LOGIN_TYPE] = LoginType.LOGIN_TYPE_ALI_QR
-        return await self.async_step_qr_login()
-
-    async def async_step_qr_login(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Handle QR code login step."""
-        client: CSGClient = CSGClient()
-        if user_input is None:
-            # create QR code
-            login_type = self.context["user_data"][CONF_LOGIN_TYPE]
-            login_id, image_link = await self.hass.async_add_executor_job(
-                client.api_create_login_qr_code, LOGIN_TYPE_TO_QR_CODE_TYPE[login_type]
-            )
-            self.context["user_data"]["login_id"] = login_id
-            self.context["user_data"]["image_link"] = image_link
-            return self.async_show_form(
-                step_id=STEP_QR_LOGIN,
-                data_schema=vol.Schema(
-                    {vol.Required(CONF_REFRESH_QR_CODE, default=False): bool}
-                ),
-                description_placeholders={
-                    "description": f"<p>使用{LOGIN_TYPE_TO_QR_APP_NAME[login_type]}扫码登录。登录完成后，点击下一步。"
-                    f'</p><img src="{image_link}" alt="QR code" style="width: 200px;"/>',
-                },
-            )
-        if user_input[CONF_REFRESH_QR_CODE]:
-            return await self.async_step_qr_login()
-        return await self.async_step_validate_qr_login()
-
-    async def async_step_validate_qr_login(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Get QR scan status after user has scanned the code"""
-        client: CSGClient = CSGClient()
-        login_type = self.context["user_data"][CONF_LOGIN_TYPE]
-        login_id = self.context["user_data"]["login_id"]
-        ok, auth_token = await self.hass.async_add_executor_job(
-            client.api_get_qr_login_status, login_id
-        )
-        if ok:
-            # for QR login, use mobile number as username
-            client.set_authentication_params(auth_token)
-            user_info = await self.hass.async_add_executor_job(client.api_get_user_info)
-            username = user_info["mobile"]
-            await self.check_and_set_unique_id(username)
-            return await self.create_or_update_config_entry(
-                auth_token, login_type, "", username
-            )
-
-        # scan not detected, return to previous step
-        image_link = self.context["user_data"]["image_link"]
-        return self.async_show_form(
-            step_id=STEP_QR_LOGIN,
-            data_schema=vol.Schema(
-                {vol.Required(CONF_REFRESH_QR_CODE, default=False): bool}
-            ),
-            errors={CONF_GENERAL_ERROR: ERROR_QR_NOT_SCANNED},
-            # had to do this because strings.json conflicts with html tags
-            description_placeholders={
-                "description": f"<p>使用{LOGIN_TYPE_TO_QR_APP_NAME[login_type]}扫码登录。登录完成后，点击下一步。</p>"
-                f'<img src="{image_link}" alt="QR code" style="width: 200px;"/>',
-            },
-        )
 
     async def check_and_set_unique_id(self, username: str):
         """set unique id for the config entry, abort if already configured"""

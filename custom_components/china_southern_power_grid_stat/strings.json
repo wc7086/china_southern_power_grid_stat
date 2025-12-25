@@ -1,17 +1,6 @@
 {
   "config": {
     "step": {
-      "user": {
-        "title": "选择登录方式",
-        "description": "选择用于登录南方电网账号的方式",
-        "menu_options": {
-          "sms_login": "短信验证码登录",
-          "sms_pwd_login": "短信验证码和密码登录",
-          "csg_qr_login": "南网APP扫码登录",
-          "wx_qr_login": "微信扫码登录",
-          "ali_qr_login": "支付宝扫码登录"
-        }
-      },
       "sms_login": {
         "title": "登录南方电网",
         "description": "使用手机号和短信验证码登录",
@@ -19,26 +8,11 @@
           "username": "手机号"
         }
       },
-      "sms_pwd_login": {
-        "title": "登录南方电网",
-        "description": "使用手机号、密码和短信验证码登录",
-        "data": {
-          "username": "手机号",
-          "password": "密码"
-        }
-      },
       "validate_sms_code": {
         "title": "输入短信验证码",
         "description": "验证码已发送到: {phone_no}",
         "data": {
           "code": "短信验证码"
-        }
-      },
-      "qr_login": {
-        "title": "扫码登录",
-        "description": "{description}",
-        "data": {
-          "refresh_qr_code": "刷新二维码"
         }
       },
       "reauth_confirm": {
@@ -49,7 +23,6 @@
     "error": {
       "cannot_connect": "网络异常",
       "invalid_auth": "登录信息无效",
-      "qr_not_scanned": "扫描二维码并确认登录",
       "unknown": "未知错误: {error_detail}"
     },
     "abort": {
