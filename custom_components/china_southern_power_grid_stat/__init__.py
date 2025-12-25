@@ -62,22 +62,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Register services
-    async def handle_purge_device_data(call: ServiceCall) -> None:
-        """Handle purge device data service call."""
-        device_id = call.data["device_id"]
-        await _purge_device_entity_data(hass, device_id)
-
-    async def handle_purge_all_data(call: ServiceCall) -> None:
-        """Handle purge all data service call for this integration."""
-        await _purge_entry_entity_data(hass, entry)
-
-    # Register services only once for the first entry
+    # Register services only once (shared across all entries)
     if not hass.services.has_service(DOMAIN, SERVICE_PURGE_DEVICE_DATA):
         hass.services.async_register(
             DOMAIN,
             SERVICE_PURGE_DEVICE_DATA,
-            handle_purge_device_data,
+            _handle_purge_device_data,
             schema=SERVICE_PURGE_DEVICE_DATA_SCHEMA,
         )
 
@@ -85,10 +75,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.services.async_register(
             DOMAIN,
             SERVICE_PURGE_ALL_DATA,
-            handle_purge_all_data,
+            _handle_purge_all_data,
         )
 
     return True
+
+
+async def _handle_purge_device_data(call: ServiceCall) -> None:
+    """Handle purge device data service call."""
+    hass = call.hass
+    device_id = call.data["device_id"]
+    await _purge_device_entity_data(hass, device_id)
+
+
+async def _handle_purge_all_data(call: ServiceCall) -> None:
+    """Handle purge all data service call.
+    
+    This will purge data for all entries in this integration.
+    """
+    hass = call.hass
+    # Get all entries for this domain
+    entries = hass.config_entries.async_entries(DOMAIN)
+    for entry in entries:
+        await _purge_entry_entity_data(hass, entry)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -98,10 +107,17 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _LOGGER.debug(f"Unload platforms for entry: {entry.title}, success: {unload_ok}")
     hass.data[DOMAIN].pop(entry.entry_id)
 
-    # Unregister services if no more entries
-    if not hass.config_entries.async_entries(DOMAIN):
-        hass.services.async_remove(DOMAIN, SERVICE_PURGE_DEVICE_DATA)
-        hass.services.async_remove(DOMAIN, SERVICE_PURGE_ALL_DATA)
+    # Unregister services only if this is the last entry
+    # Check after removal to avoid race conditions
+    remaining_entries = [
+        e for e in hass.config_entries.async_entries(DOMAIN)
+        if e.entry_id != entry.entry_id
+    ]
+    if not remaining_entries:
+        if hass.services.has_service(DOMAIN, SERVICE_PURGE_DEVICE_DATA):
+            hass.services.async_remove(DOMAIN, SERVICE_PURGE_DEVICE_DATA)
+        if hass.services.has_service(DOMAIN, SERVICE_PURGE_ALL_DATA):
+            hass.services.async_remove(DOMAIN, SERVICE_PURGE_ALL_DATA)
 
     return True
 

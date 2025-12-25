@@ -67,7 +67,7 @@
     },
     "purge_all_data": {
       "name": "删除所有实体数据",
-      "description": "删除此南方电网账号下所有缴费号的所有实体历史数据"
+      "description": "删除此Home Assistant实例中所有南方电网账号的所有实体历史数据"
     }
   }
 }

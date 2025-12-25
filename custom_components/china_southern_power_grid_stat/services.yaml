@@ -14,4 +14,4 @@ purge_device_data:
 
 purge_all_data:
   name: Delete all entity data
-  description: Delete all entity history data for all payment accounts under this China Southern Power Grid account
+  description: Delete all entity history data for all China Southern Power Grid accounts in this Home Assistant instance
