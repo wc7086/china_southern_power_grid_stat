@@ -200,6 +200,7 @@ class CSGConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             CONF_ELE_ACCOUNTS: {},
             CONF_SETTINGS: {
                 CONF_UPDATE_INTERVAL: DEFAULT_UPDATE_INTERVAL,
+                CONF_DELETE_ENTITY_DATA_ON_REMOVAL: False,
             },
             CONF_UPDATED_AT: str(int(time.time() * 1000)),
         }
@@ -211,6 +212,9 @@ class CSGConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             old_config = copy.deepcopy(dict(self._reauth_entry.data))
             data[CONF_ELE_ACCOUNTS] = old_config[CONF_ELE_ACCOUNTS]
             data[CONF_SETTINGS] = old_config[CONF_SETTINGS]
+            # Ensure new setting exists in old entries
+            if CONF_DELETE_ENTITY_DATA_ON_REMOVAL not in data[CONF_SETTINGS]:
+                data[CONF_SETTINGS][CONF_DELETE_ENTITY_DATA_ON_REMOVAL] = False
             self.hass.config_entries.async_update_entry(self._reauth_entry, data=data)
             await self.hass.config_entries.async_reload(self._reauth_entry.entry_id)
             self._reauth_entry = None

@@ -11,6 +11,7 @@ from homeassistant.const import CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry
 from homeassistant.helpers.device_registry import DeviceEntry
 
@@ -123,8 +124,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def _purge_device_entity_data(hass: HomeAssistant, device_id: str) -> None:
     """Purge entity history data for a specific device."""
-    import homeassistant.helpers.device_registry as dr
-
     device_registry = dr.async_get(hass)
     device_entry = device_registry.async_get(device_id)
 
