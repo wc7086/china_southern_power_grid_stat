@@ -549,67 +549,29 @@ class CSGCoordinator(DataUpdateCoordinator):
 
     @staticmethod
     def merge_by_day_data(
-        by_day_from_cost: list | str,
-        kwh_from_cost: float | str,
         by_day_from_usage: list | str,
         kwh_from_usage: float | str,
     ) -> (list | str, float | str):
-        """Merge by_day_from_usage and by_day_from_cost data"""
-        # merge by_day
-        # determine which is the latest
-        if (
-            by_day_from_cost == STATE_UNAVAILABLE
-            and by_day_from_usage == STATE_UNAVAILABLE
-        ):
-            by_day = STATE_UNAVAILABLE
-        elif by_day_from_cost == STATE_UNAVAILABLE:
-            by_day = by_day_from_usage
-        elif by_day_from_usage == STATE_UNAVAILABLE:
-            by_day = by_day_from_cost
-        else:
-            # both are available
-            if len(by_day_from_cost) >= len(by_day_from_usage):
-                # the result from daily cost is newer
-                by_day = by_day_from_cost
-            else:
-                # the result from daily usage is newer
-                # but since the result from daily cost contains cost data, need to merge them
-                by_day = by_day_from_usage
-                for idx, item in enumerate(by_day_from_cost):
-                    by_day[idx][WF_ATTR_CHARGE] = item[WF_ATTR_CHARGE]
-
-        # determine which one to use as kwh
-        if kwh_from_cost == STATE_UNAVAILABLE and kwh_from_usage == STATE_UNAVAILABLE:
-            kwh = STATE_UNAVAILABLE
-        elif kwh_from_cost == STATE_UNAVAILABLE:
-            kwh = kwh_from_usage
-        elif kwh_from_usage == STATE_UNAVAILABLE:
-            kwh = kwh_from_cost
-        else:
-            # determine which kwh is the latest
-            # get the larger one
-            kwh = max(kwh_from_cost, kwh_from_usage)
+        """Return by_day data from usage (simplified - no longer merges cost data)"""
+        # Since we're no longer using the cost API, just return usage data
+        by_day = by_day_from_usage
+        kwh = kwh_from_usage
         return by_day, kwh
 
     async def _async_update_this_month_stats_and_ladder(
         self, account: CSGElectricityAccount
     ):
         """Update this month's usage, cost and ladder"""
-        # fetch usage and cost in parallel
+        # Only fetch usage data - cost API is deprecated
         task_fetch_usage = asyncio.create_task(
             self._async_fetch(
                 self._client.get_month_daily_usage_detail, account, self._this_month_ym
             )
         )
-        task_fetch_cost = asyncio.create_task(
-            self._async_fetch(
-                self._client.get_month_daily_cost_detail, account, self._this_month_ym
-            )
-        )
 
-        results = await asyncio.gather(task_fetch_usage, task_fetch_cost)
+        results = await asyncio.gather(task_fetch_usage)
 
-        (success_usage, result_usage), (success_cost, result_cost) = results
+        (success_usage, result_usage), = results
 
         if success_usage:
             this_month_kwh_from_usage, this_month_by_day_from_usage = result_usage
@@ -617,61 +579,16 @@ class CSGCoordinator(DataUpdateCoordinator):
             this_month_kwh_from_usage = STATE_UNAVAILABLE
             this_month_by_day_from_usage = STATE_UNAVAILABLE
 
-        if success_cost:
-            (
-                this_month_cost,
-                this_month_kwh_from_cost,
-                ladder,
-                this_month_by_day_from_cost,
-            ) = result_cost
-            # special processing
-            if this_month_cost is None:
-                this_month_cost = STATE_UNAVAILABLE
-            if this_month_kwh_from_cost is None:
-                this_month_kwh_from_cost = STATE_UNAVAILABLE
-            ladder_stage = (
-                ladder[WF_ATTR_LADDER]
-                if ladder[WF_ATTR_LADDER] is not None
-                else STATE_UNAVAILABLE
-            )
-            ladder_remaining_kwh = (
-                ladder[WF_ATTR_LADDER_REMAINING_KWH]
-                if ladder[WF_ATTR_LADDER_REMAINING_KWH] is not None
-                else STATE_UNAVAILABLE
-            )
-            ladder_tariff = (
-                ladder[WF_ATTR_LADDER_TARIFF]
-                if ladder[WF_ATTR_LADDER_TARIFF] is not None
-                else STATE_UNAVAILABLE
-            )
-            ladder_start_date = (
-                ladder[WF_ATTR_LADDER_START_DATE]
-                if ladder[WF_ATTR_LADDER_START_DATE] is not None
-                else STATE_UNAVAILABLE
-            )
-        else:
-            (
-                this_month_cost,
-                this_month_kwh_from_cost,
-                this_month_by_day_from_cost,
-                ladder_stage,
-                ladder_remaining_kwh,
-                ladder_tariff,
-                ladder_start_date,
-            ) = (
-                STATE_UNAVAILABLE,
-                STATE_UNAVAILABLE,
-                STATE_UNAVAILABLE,
-                STATE_UNAVAILABLE,
-                STATE_UNAVAILABLE,
-                STATE_UNAVAILABLE,
-                STATE_UNAVAILABLE,
-            )
+        # Set cost and ladder data to unavailable (deprecated API)
+        this_month_cost = STATE_UNAVAILABLE
+        ladder_stage = STATE_UNAVAILABLE
+        ladder_remaining_kwh = STATE_UNAVAILABLE
+        ladder_tariff = STATE_UNAVAILABLE
+        ladder_start_date = STATE_UNAVAILABLE
+
         this_month_by_day, this_month_kwh = self.merge_by_day_data(
             by_day_from_usage=this_month_by_day_from_usage,
             kwh_from_usage=this_month_kwh_from_usage,
-            by_day_from_cost=this_month_by_day_from_cost,
-            kwh_from_cost=this_month_kwh_from_cost,
         )
 
         if this_month_by_day == STATE_UNAVAILABLE:
@@ -728,21 +645,27 @@ class CSGCoordinator(DataUpdateCoordinator):
                 return
 
         # continue to update last month's data
-        # fetch usage and cost in parallel
+        # fetch usage details for by_day and yearly stats for cost/kwh totals
         task_fetch_usage = asyncio.create_task(
             self._async_fetch(
                 self._client.get_month_daily_usage_detail, account, self._last_month_ym
             )
         )
-        task_fetch_cost = asyncio.create_task(
+        
+        # Use the yearly API to get last month's cost and kwh
+        last_month_year, last_month_month = self._last_month_ym
+        task_fetch_monthly_stats = asyncio.create_task(
             self._async_fetch(
-                self._client.get_month_daily_cost_detail, account, self._last_month_ym
+                self._client.get_month_stats_from_yearly,
+                account,
+                last_month_year,
+                last_month_month,
             )
         )
 
-        results = await asyncio.gather(task_fetch_usage, task_fetch_cost)
+        results = await asyncio.gather(task_fetch_usage, task_fetch_monthly_stats)
 
-        (success_usage, result_usage), (success_cost, result_cost) = results
+        (success_usage, result_usage), (success_monthly_stats, result_monthly_stats) = results
 
         if success_usage:
             last_month_kwh_from_usage, last_month_by_day_from_usage = result_usage
@@ -750,38 +673,26 @@ class CSGCoordinator(DataUpdateCoordinator):
             last_month_kwh_from_usage = STATE_UNAVAILABLE
             last_month_by_day_from_usage = STATE_UNAVAILABLE
 
-        if success_cost:
-            (
-                last_month_cost,
-                last_month_kwh_from_cost,
-                _,  # ladder is discarded
-                last_month_by_day_from_cost,
-            ) = result_cost
-
-            # for last month, it's safe to calculate total kwh from cost
-            if not last_month_cost:
-                last_month_cost = sum(
-                    d[WF_ATTR_CHARGE] for d in last_month_by_day_from_cost
-                )
-            if not last_month_kwh_from_cost:
-                last_month_kwh_from_cost = sum(
-                    d[WF_ATTR_KWH] for d in last_month_by_day_from_cost
-                )
+        if success_monthly_stats:
+            last_month_cost, last_month_kwh_from_yearly = result_monthly_stats
+            # Convert None to STATE_UNAVAILABLE
+            if last_month_cost is None:
+                last_month_cost = STATE_UNAVAILABLE
+            if last_month_kwh_from_yearly is None:
+                last_month_kwh_from_yearly = STATE_UNAVAILABLE
         else:
-            (
-                last_month_cost,
-                last_month_kwh_from_cost,
-                last_month_by_day_from_cost,
-            ) = (
-                STATE_UNAVAILABLE,
-                STATE_UNAVAILABLE,
-                STATE_UNAVAILABLE,
-            )
-        last_month_by_day, last_month_kwh = self.merge_by_day_data(
+            last_month_cost = STATE_UNAVAILABLE
+            last_month_kwh_from_yearly = STATE_UNAVAILABLE
+
+        # Merge kwh data - prefer yearly stats if available, otherwise use usage
+        if last_month_kwh_from_yearly != STATE_UNAVAILABLE:
+            last_month_kwh = last_month_kwh_from_yearly
+        else:
+            last_month_kwh = last_month_kwh_from_usage
+
+        last_month_by_day, _ = self.merge_by_day_data(
             by_day_from_usage=last_month_by_day_from_usage,
             kwh_from_usage=last_month_kwh_from_usage,
-            by_day_from_cost=last_month_by_day_from_cost,
-            kwh_from_cost=last_month_kwh_from_cost,
         )
 
         self._gathered_data[account.account_number][
@@ -813,9 +724,8 @@ class CSGCoordinator(DataUpdateCoordinator):
             if this_month_by_day != STATE_UNAVAILABLE and len(this_month_by_day) >= 1:
                 # we have this month's data, use the latest day
                 latest_day_kwh = this_month_by_day[-1][WF_ATTR_KWH]
-                latest_day_cost = (
-                    this_month_by_day[-1].get(WF_ATTR_CHARGE) or STATE_UNAVAILABLE
-                )
+                # Cost is no longer available from by_day data
+                latest_day_cost = STATE_UNAVAILABLE
                 latest_day_date = this_month_by_day[-1][WF_ATTR_DATE]
             else:
                 # this month isn't available yet (typically during the first 3 days)
