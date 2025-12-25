@@ -206,7 +206,8 @@ class CSGConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if self._reauth_entry:
             # reauth
             # save the old config and only update the auth related data
-            old_config = copy.deepcopy(self._reauth_entry.data)
+            # Convert mappingproxy to dict before deepcopy to avoid pickle error
+            old_config = copy.deepcopy(dict(self._reauth_entry.data))
             data[CONF_ELE_ACCOUNTS] = old_config[CONF_ELE_ACCOUNTS]
             data[CONF_SETTINGS] = old_config[CONF_SETTINGS]
             self.hass.config_entries.async_update_entry(self._reauth_entry, data=data)
