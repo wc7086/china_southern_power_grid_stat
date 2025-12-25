@@ -112,7 +112,7 @@ async def _purge_device_entity_data(hass: HomeAssistant, device_id: str) -> None
 
     device_registry = dr.async_get(hass)
     device_entry = device_registry.async_get(device_id)
-    
+
     if not device_entry:
         _LOGGER.warning(f"Device {device_id} not found")
         return
@@ -121,18 +121,21 @@ async def _purge_device_entity_data(hass: HomeAssistant, device_id: str) -> None
     entities = entity_registry.async_entries_for_device(
         entity_reg, device_id, include_disabled_entities=True
     )
-    
+
     entity_ids = [ent.entity_id for ent in entities]
-    
+
     if entity_ids:
         _LOGGER.info(f"Purging entity data for device {device_entry.name}: {entity_ids}")
-        await hass.services.async_call(
-            "recorder",
-            "purge_entities",
-            {"entity_id": entity_ids},
-            blocking=True,
-        )
-        _LOGGER.info(f"Successfully purged entity data for device {device_entry.name}")
+        try:
+            await hass.services.async_call(
+                "recorder",
+                "purge_entities",
+                {"entity_id": entity_ids},
+                blocking=True,
+            )
+            _LOGGER.info(f"Successfully purged entity data for device {device_entry.name}")
+        except Exception as e:
+            _LOGGER.error(f"Error purging entity data for device {device_entry.name}: {e}")
 
 
 async def _purge_entry_entity_data(hass: HomeAssistant, config_entry: ConfigEntry) -> None:
@@ -141,18 +144,21 @@ async def _purge_entry_entity_data(hass: HomeAssistant, config_entry: ConfigEntr
     entities = entity_registry.async_entries_for_config_entry(
         entity_reg, config_entry.entry_id
     )
-    
+
     entity_ids = [ent.entity_id for ent in entities]
-    
+
     if entity_ids:
         _LOGGER.info(f"Purging entity data for entry {config_entry.title}: {entity_ids}")
-        await hass.services.async_call(
-            "recorder",
-            "purge_entities",
-            {"entity_id": entity_ids},
-            blocking=True,
-        )
-        _LOGGER.info(f"Successfully purged entity data for entry {config_entry.title}")
+        try:
+            await hass.services.async_call(
+                "recorder",
+                "purge_entities",
+                {"entity_id": entity_ids},
+                blocking=True,
+            )
+            _LOGGER.info(f"Successfully purged entity data for entry {config_entry.title}")
+        except Exception as e:
+            _LOGGER.error(f"Error purging entity data for entry {config_entry.title}: {e}")
 
 
 async def async_remove_config_entry_device(
