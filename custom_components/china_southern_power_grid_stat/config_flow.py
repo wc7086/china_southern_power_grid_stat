@@ -98,7 +98,6 @@ class CSGConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 ),
             )
         self.context["user_data"][CONF_USERNAME] = user_input[CONF_USERNAME]
-        self.context["user_data"][CONF_PASSWORD] = ""
         self.context["user_data"][CONF_LOGIN_TYPE] = LoginType.LOGIN_TYPE_SMS
         return await self.async_step_validate_sms_code()
 
@@ -145,7 +144,6 @@ class CSGConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
 
         # sms code is present, validate with api
-        password = self.context["user_data"][CONF_PASSWORD]
         login_type: LoginType = self.context["user_data"][CONF_LOGIN_TYPE]
         sms_code = user_input[CONF_SMS_CODE]
 
@@ -168,7 +166,7 @@ class CSGConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             error_detail = str(ge)
         else:
             return await self.create_or_update_config_entry(
-                auth_token, login_type, password, username
+                auth_token, login_type, "", username
             )
         return self.async_show_form(
             step_id=STEP_VALIDATE_SMS_CODE,
