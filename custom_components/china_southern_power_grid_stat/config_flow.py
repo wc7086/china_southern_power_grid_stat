@@ -27,6 +27,7 @@ from .const import (
     CONF_ACCOUNT_NUMBER,
     CONF_ACTION,
     CONF_AUTH_TOKEN,
+    CONF_DELETE_ENTITY_DATA_ON_REMOVAL,
     CONF_ELE_ACCOUNTS,
     CONF_GENERAL_ERROR,
     CONF_LOGIN_TYPE,
@@ -367,11 +368,17 @@ class CSGOptionsFlowHandler(config_entries.OptionsFlow):
     ) -> FlowResult:
         """Settings of parameters"""
         update_interval = self.config_entry.data[CONF_SETTINGS][CONF_UPDATE_INTERVAL]
+        delete_entity_data = self.config_entry.data[CONF_SETTINGS].get(
+            CONF_DELETE_ENTITY_DATA_ON_REMOVAL, False
+        )
         schema = vol.Schema(
             {
                 vol.Required(CONF_UPDATE_INTERVAL, default=update_interval): vol.All(
                     int, vol.Range(min=60), msg="刷新间隔不能低于60秒"
                 ),
+                vol.Optional(
+                    CONF_DELETE_ENTITY_DATA_ON_REMOVAL, default=delete_entity_data
+                ): bool,
             }
         )
         if user_input is None:
@@ -379,6 +386,9 @@ class CSGOptionsFlowHandler(config_entries.OptionsFlow):
 
         new_data = self.config_entry.data.copy()
         new_data[CONF_SETTINGS][CONF_UPDATE_INTERVAL] = user_input[CONF_UPDATE_INTERVAL]
+        new_data[CONF_SETTINGS][CONF_DELETE_ENTITY_DATA_ON_REMOVAL] = user_input.get(
+            CONF_DELETE_ENTITY_DATA_ON_REMOVAL, False
+        )
         new_data[CONF_UPDATED_AT] = str(int(time.time() * 1000))
         self.hass.config_entries.async_update_entry(
             self.config_entry,

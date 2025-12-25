@@ -1,0 +1,17 @@
+# Services for China Southern Power Grid Statistics integration
+
+purge_device_data:
+  name: Delete device entity data
+  description: Delete all entity history data for a specific device
+  fields:
+    device_id:
+      name: Device ID
+      description: The device ID to delete data for
+      required: true
+      selector:
+        device:
+          integration: china_southern_power_grid_stat
+
+purge_all_data:
+  name: Delete all entity data
+  description: Delete all entity history data for all payment accounts under this China Southern Power Grid account
