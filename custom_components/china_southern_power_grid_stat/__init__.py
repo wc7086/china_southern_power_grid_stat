@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import cast
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
@@ -90,7 +89,7 @@ async def _handle_purge_device_data(call: ServiceCall) -> None:
 
 async def _handle_purge_all_data(call: ServiceCall) -> None:
     """Handle purge all data service call.
-    
+
     This will purge data for all entries in this integration.
     """
     hass = call.hass
