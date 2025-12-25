@@ -799,4 +799,27 @@ class CSGClient:
         if resp_data["power"] is not None:
             return float(resp_data["power"])
 
+    def get_month_stats_from_yearly(
+        self, account: CSGElectricityAccount, year: int, month: int
+    ) -> tuple[float | None, float | None]:
+        """Get monthly cost and kwh from yearly API data
+        Returns (total_cost, total_kwh) for the specified month
+        Returns (None, None) if the month data is not found
+        """
+        resp_data = self.api_get_fee_analyze_details(
+            year, account.area_code, account.ele_customer_id
+        )
+        
+        # Look for the specified month in the electricAndChargeList
+        target_month_str = f"{year}-{month:02d}"
+        for m_data in resp_data["electricAndChargeList"]:
+            if m_data[JSON_KEY_YEAR_MONTH] == target_month_str:
+                return (
+                    float(m_data["actualTotalAmount"]),
+                    float(m_data["billingElectricity"]),
+                )
+        
+        # Month not found in the response
+        return None, None
+
     # end high-level api wrappers
