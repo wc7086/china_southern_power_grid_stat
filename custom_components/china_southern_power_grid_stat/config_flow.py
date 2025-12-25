@@ -181,7 +181,9 @@ class CSGConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # TODO: username (mobile) may not be the best unique id
         unique_id = f"CSG-{username}"
         await self.async_set_unique_id(unique_id)
-        self._abort_if_unique_id_configured()
+        # Don't abort if we're in a reauth flow, as we're updating an existing entry
+        if not self._reauth_entry:
+            self._abort_if_unique_id_configured()
 
     async def create_or_update_config_entry(
         self, auth_token, login_type, password, username
