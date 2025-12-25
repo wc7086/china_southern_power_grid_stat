@@ -16,6 +16,7 @@ CONF_SETTINGS = "settings"
 CONF_UPDATED_AT = "updated_at"
 CONF_ACTION = "action"
 CONF_SMS_CODE = "sms_code"
+CONF_DELETE_ENTITY_DATA_ON_REMOVAL = "delete_entity_data_on_removal"
 
 STEP_USER = "user"
 STEP_SMS_LOGIN = "sms_login"
@@ -31,6 +32,10 @@ CONF_GENERAL_ERROR = "base"
 ERROR_CANNOT_CONNECT = "cannot_connect"
 ERROR_INVALID_AUTH = "invalid_auth"
 ERROR_UNKNOWN = "unknown"
+
+# services
+SERVICE_PURGE_DEVICE_DATA = "purge_device_data"
+SERVICE_PURGE_ALL_DATA = "purge_all_data"
 
 # api
 
